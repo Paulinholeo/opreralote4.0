@@ -80,24 +80,24 @@ class TextFileEditor:
             start_pos = match.end()
             remaining = filename[start_pos:]
             
-        # Procura por um número sequencial (2 dígitos, não 00) seguido de zeros
-        seq_match = re.match(r'([1-9]\d)0+', remaining)
-        if seq_match:
-            # Remove o número sequencial e mantém apenas os zeros
-            seq_number = seq_match.group(1)
-            zeros_part = remaining[len(seq_number):]
-            new_remaining = zeros_part
+            # Procura por um número sequencial (2 dígitos, não 00) seguido de zeros
+            seq_match = re.match(r'([1-9]\d)0+', remaining)
+            if seq_match:
+                # Remove o número sequencial e mantém apenas os zeros
+                seq_number = seq_match.group(1)
+                zeros_part = remaining[len(seq_number):]
+                new_remaining = zeros_part
+            else:
+                # Se não há número sequencial, mantém o resto como está
+                new_remaining = remaining
+            
+            filename = new_number_padded + new_remaining
         else:
-            # Se não há número sequencial, mantém o resto como está
-            new_remaining = remaining
-        
-        filename = new_number_padded + new_remaining
-    else:
-        # Fallback: procura por qualquer ocorrência do número antigo
-        if old_name_number in filename:
-            filename = filename.replace(old_name_number, new_number_padded)
-        elif old_number_trimmed in filename:
-            filename = filename.replace(old_number_trimmed, new_number_padded)
+            # Fallback: procura por qualquer ocorrência do número antigo
+            if old_name_number in filename:
+                filename = filename.replace(old_name_number, new_number_padded)
+            elif old_number_trimmed in filename:
+                filename = filename.replace(old_number_trimmed, new_number_padded)
         
         return filename
 
