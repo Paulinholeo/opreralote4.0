@@ -53,7 +53,7 @@ class Application(tk.CTkFrame):
 
         self.old_name_label = tk.CTkLabel(self, text="Escolha o lote a ser renomeado", font=("Arial", 15))
         self.old_name_label.pack()
-        self.lote_combo = tk.CTkComboBox(self, width=250)
+        self.lote_combo = tk.CTkComboBox(self, width=250, placeholder_text="Escolha o lote")
         self.lote_combo.pack(fill="x", padx=12, pady=10)
 
         self.space_label = tk.CTkLabel(self, text="", height=2)
