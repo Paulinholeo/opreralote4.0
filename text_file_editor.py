@@ -67,37 +67,44 @@ class TextFileEditor:
             str: Nome do arquivo atualizado
         """
         # Padroniza os números
-        old_number_trimmed = old_name_number.lstrip('0')
+        old_number_padded = self._create_padded_number(old_name_number)
         new_number_padded = self._create_padded_number(new_name_number)
         
-        # Procura pelo padrão específico: 00 + número_do_lote
-        pattern = r'00' + re.escape(old_number_trimmed)
-        match = re.search(pattern, filename)
-        
-        if match:
-            # Substitui o padrão encontrado pelo novo número
-            # Mas também remove o número sequencial que vem depois
-            start_pos = match.end()
-            remaining = filename[start_pos:]
-            
-            # Procura por um número sequencial (2 dígitos, não 00) seguido de zeros
-            seq_match = re.match(r'([1-9]\d)0+', remaining)
-            if seq_match:
-                # Remove o número sequencial e mantém apenas os zeros
-                seq_number = seq_match.group(1)
-                zeros_part = remaining[len(seq_number):]
-                new_remaining = zeros_part
-            else:
-                # Se não há número sequencial, mantém o resto como está
-                new_remaining = remaining
-            
-            filename = new_number_padded + new_remaining
+        # Remove extensão para processamento
+        if filename.endswith('.jpg'):
+            name_without_ext = filename[:-4]
+            file_ext = '.jpg'
         else:
-            # Fallback: procura por qualquer ocorrência do número antigo
-            if old_name_number in filename:
-                filename = filename.replace(old_name_number, new_number_padded)
-            elif old_number_trimmed in filename:
-                filename = filename.replace(old_number_trimmed, new_number_padded)
+            name_without_ext = filename
+            file_ext = ''
+        
+        # Verifica se o arquivo começa com o número do lote
+        if name_without_ext.startswith(old_number_padded):
+            rest_part = name_without_ext[len(old_number_padded):]
+            old_number_trimmed = old_name_number.lstrip('0')
+            
+            # Verifica se há duplicação no rest_part
+            # Padrão: 000017070000060a -> 0000170 + 70 + 000060a
+            # Onde 70 são os últimos 2 dígitos do lote (170 -> 70)
+            if len(rest_part) >= 2 and len(old_number_trimmed) >= 2:
+                last_two_digits = old_number_trimmed[-2:]
+                first_two_rest = rest_part[:2]
+                
+                if first_two_rest == last_two_digits:
+                    # Remove a duplicação (primeiros 2 dígitos do rest_part)
+                    corrected_rest = rest_part[2:]
+                    return new_number_padded + corrected_rest + file_ext
+                else:
+                    # Sem duplicação, mantém o rest_part como está
+                    return new_number_padded + rest_part + file_ext
+            else:
+                # Rest_part muito curto ou old_number muito curto
+                return new_number_padded + rest_part + file_ext
+        
+        # Fallback: substituição direta se o número antigo estiver em qualquer lugar
+        if old_number_padded in name_without_ext:
+            corrected_name = name_without_ext.replace(old_number_padded, new_number_padded, 1)
+            return corrected_name + file_ext
         
         return filename
 

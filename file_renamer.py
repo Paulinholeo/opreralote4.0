@@ -170,50 +170,36 @@ class FileRenamer:
             new_number_padded = self._create_padded_number(new_name_number)
             old_number_padded = self._create_padded_number(old_name_number)
             
-            # Caso especial: quando old_name == new_name, mas precisamos padronizar o formato
-            if old_name_number == new_name_number:
-                # Procura por sequências que comecem com o número do lote
-                digit_sequences = re.findall(r'\d{5,}', file_name_without_ext)
+            # Verifica se o arquivo começa com o número do lote
+            if file_name_without_ext.startswith(old_number_padded):
+                rest_part = file_name_without_ext[len(old_number_padded):]
+                old_number_trimmed = old_name_number.lstrip('0')
                 
-                # Processa as sequências em ordem de comprimento decrescente
-                for seq in sorted(digit_sequences, key=len, reverse=True):
-                    # Verifica se a sequência começa com o número do lote
-                    if seq.startswith(old_number_padded):
-                        # Verifica se após o número do lote temos uma continuação que também contém 
-                        # parte do número do lote (caso do problema L03889)
-                        rest_part = seq[len(old_number_padded):]
-                        old_number_trimmed = old_name_number.lstrip('0')
-                        
-                        # Verifica se o restante começa com parte do número do lote
-                        # Isso detecta casos como 0003889889 onde 889 é parte do número 03889
-                        # Precisamos verificar se o início do rest_part corresponde ao início do número do lote
-                        condition = False
-                        if len(rest_part) >= 3:  # Precisamos de pelo menos 3 dígitos para comparar
-                            # Verifica se os primeiros 3 dígitos do rest_part correspondem aos últimos 3 do número do lote
-                            if len(old_number_trimmed) >= 3:
-                                last_three_digits = old_number_trimmed[-3:]
-                                first_three_rest = rest_part[:3]
-                                condition = last_three_digits == first_three_rest
-                        
-                        if condition:
-                            # Substitui toda a parte que corresponde ao número do lote duplicado
-                            # por apenas uma ocorrência do número padronizado
-                            # Mas precisamos ser mais precisos aqui
-                            # O que queremos remover é a parte duplicada
-                            # No caso de 0003889889, queremos remover o 889 extra
-                            new_seq = new_number_padded + rest_part[3:]  # Remove os 3 dígitos duplicados
-                            new_file_name_without_ext = file_name_without_ext.replace(seq, new_seq, 1)
-                            return self._perform_file_rename(filename, new_file_name_without_ext + file_ext)
-                        else:
-                            # Caso normal: substitui o prefixo que corresponde ao número do lote
-                            new_seq = new_number_padded + rest_part
-                            new_file_name_without_ext = file_name_without_ext.replace(seq, new_seq, 1)
-                            return self._perform_file_rename(filename, new_file_name_without_ext + file_ext)
-                
-                # Se não encontrou padrões complexos, tenta substituição direta
-                if old_number_padded in file_name_without_ext and old_number_padded != new_number_padded:
-                    new_file_name_without_ext = file_name_without_ext.replace(old_number_padded, new_number_padded, 1)
+                # Verifica se há duplicação no rest_part
+                # Padrão: 000017070000060a -> 0000170 + 70 + 000060a
+                # Onde 70 são os últimos 2 dígitos do lote (170 -> 70)
+                if len(rest_part) >= 2 and len(old_number_trimmed) >= 2:
+                    last_two_digits = old_number_trimmed[-2:]
+                    first_two_rest = rest_part[:2]
+                    
+                    if first_two_rest == last_two_digits:
+                        # Remove a duplicação (primeiros 2 dígitos do rest_part)
+                        corrected_rest = rest_part[2:]
+                        new_file_name_without_ext = new_number_padded + corrected_rest
+                        return self._perform_file_rename(filename, new_file_name_without_ext + file_ext)
+                    else:
+                        # Sem duplicação, mantém o rest_part como está
+                        new_file_name_without_ext = new_number_padded + rest_part
+                        return self._perform_file_rename(filename, new_file_name_without_ext + file_ext)
+                else:
+                    # Rest_part muito curto ou old_number muito curto
+                    new_file_name_without_ext = new_number_padded + rest_part
                     return self._perform_file_rename(filename, new_file_name_without_ext + file_ext)
+            
+            # Fallback: substituição direta se o número antigo estiver em qualquer lugar
+            if old_number_padded in file_name_without_ext:
+                new_file_name_without_ext = file_name_without_ext.replace(old_number_padded, new_number_padded, 1)
+                return self._perform_file_rename(filename, new_file_name_without_ext + file_ext)
             
             return False
         except Exception as e:
