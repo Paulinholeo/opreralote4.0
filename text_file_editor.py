@@ -77,20 +77,31 @@ class TextFileEditor:
         old_number_trimmed = old_name_number.lstrip('0')
         new_number_padded = self._create_padded_number(new_name_number)
         
+        print(f"    DEBUG JPG: filename='{filename}', old_number='{old_name_number}', new_number='{new_name_number}'")
+        print(f"    DEBUG JPG: old_trimmed='{old_number_trimmed}', new_padded='{new_number_padded}'")
+        
         # Procura por sequências de 5 ou mais dígitos
         digit_sequences = re.findall(r'\d{5,}', filename)
+        print(f"    DEBUG JPG: digit_sequences={digit_sequences}")
         
         # Para cada sequência encontrada, verifica se corresponde ao padrão antigo
         for seq in sorted(digit_sequences, key=len, reverse=True):
             seq_trimmed = seq.lstrip('0')
+            print(f"    DEBUG JPG: seq='{seq}', seq_trimmed='{seq_trimmed}'")
             
             # Verifica se a sequência contém o número antigo
             if seq_trimmed.startswith(old_number_trimmed):
+                print(f"    DEBUG JPG: Match found! seq_trimmed starts with old_number_trimmed")
+                # Encontra a posição do número antigo na sequência original
+                # Considera os zeros à esquerda que foram removidos no trimmed
+                zeros_removed = len(seq) - len(seq_trimmed)
+                pos_in_original = zeros_removed + len(old_number_trimmed)
                 # Calcula a parte restante após o número do lote
-                # A parte restante é o que vem depois do número do lote na sequência
-                rest_part = seq[len(old_number_trimmed):]
+                rest_part = seq[pos_in_original:]
                 # Cria o novo padrão: novo número com 7 dígitos + parte restante
                 new_seq = new_number_padded + rest_part
+                print(f"    DEBUG JPG: zeros_removed={zeros_removed}, pos_in_original={pos_in_original}")
+                print(f"    DEBUG JPG: rest_part='{rest_part}', new_seq='{new_seq}'")
                 filename = filename.replace(seq, new_seq)
                 break  # Processa apenas a primeira sequência encontrada
             # Verifica também se a sequência inteira corresponde ao número do lote
