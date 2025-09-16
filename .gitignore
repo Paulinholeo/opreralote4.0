@@ -1,14 +1,21 @@
 # ===========================================
-# OperaLote 3.0 - Sistema de Análise de Infrações
+# OperaLote 4.3 - Sistema de Análise de Infrações
 # ===========================================
 
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# C extensions
-*.so
+# ===========================================
+# ESTRUTURA DO PROJETO
+# ===========================================
+# Diretórios organizados seguindo Clean Code
+# src/          - Código fonte principal
+# docs/         - Documentação
+# tests/        - Arquivos de teste e debug
+# build/        - Arquivos de build e spec
+# scripts/      - Scripts de automação
+# config/       - Arquivos de configuração
+# assets/       - Recursos (logos, imagens)
+# logs/         - Arquivos de log
+# dist/         - Executáveis compilados
+# output/       - Arquivos de saída
 
 # ===========================================
 # BUILD E DISTRIBUIÇÃO
@@ -31,6 +38,7 @@ install.log
 # ARQUIVOS DE TESTE E DEBUG
 # ===========================================
 # Arquivos de teste específicos do projeto
+tests/
 test_*.py
 debug_*.py
 diagnostic_test.py
@@ -50,6 +58,9 @@ venv.bak/
 # ===========================================
 # PYTHON PACKAGING
 # ===========================================
+__pycache__/
+*.py[cod]
+*$py.class
 .Python
 develop-eggs/
 downloads/
@@ -87,6 +98,7 @@ coverage.xml
 # ===========================================
 # LOGS E TEMPORÁRIOS
 # ===========================================
+logs/
 *.log
 pip-log.txt
 pip-delete-this-directory.txt

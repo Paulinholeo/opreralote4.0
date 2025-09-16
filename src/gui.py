@@ -4,7 +4,9 @@ from tkinter import filedialog, messagebox
 from file_renamer import FileRenamer
 from PIL import Image, ImageTk
 import os
+import sys
 from text_file_editor import TextFileEditor
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets'))
 from CTkScrollableDropdown import *
 from infraction_analyzer import InfractionAnalyzer
 
@@ -15,7 +17,28 @@ class Application(tk.CTkFrame):
         self.master = master
         self.master.geometry("850x800")  # Aumentado para acomodar novos campos
         self.master.title("LOTE BRASCONTROL")
-        self.master.iconbitmap('logo/b.ico')  
+        # Configura o ícone da aplicação
+        try:
+            # Tenta diferentes caminhos para o ícone
+            possible_paths = [
+                os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets', 'logo', 'b.ico'),
+                os.path.join(os.getcwd(), 'assets', 'logo', 'b.ico'),
+                'assets/logo/b.ico'
+            ]
+            
+            icon_path = None
+            for path in possible_paths:
+                if os.path.exists(path):
+                    icon_path = path
+                    break
+            
+            if icon_path:
+                self.master.iconbitmap(icon_path)
+                print(f"Ícone carregado: {icon_path}")
+            else:
+                print("Ícone não encontrado em nenhum dos caminhos testados")
+        except Exception as e:
+            print(f"Erro ao carregar ícone: {e}")  
         self.pack(padx=12,pady=12)
         self.file_list = []
         self.infraction_analyzer = None
@@ -33,6 +56,15 @@ class Application(tk.CTkFrame):
             tk.set_appearance_mode('System')
             
         print("Tema Claro: ", self.switch_var.get())
+    
+    def toggle_year_entry(self):
+        """Habilita/desabilita o campo de entrada do ano baseado no checkbox"""
+        if self.add_year_var.get():
+            self.year_entry.configure(state="normal")
+            self.year_label.configure(text_color=("gray10", "gray90"))
+        else:
+            self.year_entry.configure(state="disabled")
+            self.year_label.configure(text_color=("gray50", "gray50"))
 
     def create_widgets(self):
         self.file_renamer = None
@@ -63,6 +95,34 @@ class Application(tk.CTkFrame):
         self.new_name_label.pack()
         self.new_name_entry = tk.CTkEntry(self, width=350, height=35, placeholder_text="ex.: L05286")
         self.new_name_entry.pack(padx=12, pady=10)
+        
+        # Frame para opções de ano
+        self.year_frame = tk.CTkFrame(self)
+        self.year_frame.pack(padx=12, pady=5, fill="x")
+        
+        # Checkbox para adicionar ano
+        self.add_year_var = tk.BooleanVar(value=True)  # Default: True (adicionar ano)
+        self.add_year_checkbox = tk.CTkCheckBox(
+            self.year_frame, 
+            text="Adicionar ano ao código de infração", 
+            variable=self.add_year_var,
+            command=self.toggle_year_entry
+        )
+        self.add_year_checkbox.pack(side="left", padx=10, pady=5)
+        
+        # Campo de entrada para o ano
+        self.year_entry = tk.CTkEntry(
+            self.year_frame, 
+            width=80, 
+            height=30, 
+            placeholder_text="2023"
+        )
+        self.year_entry.insert(0, "2023")  # Valor padrão
+        self.year_entry.pack(side="left", padx=10, pady=5)
+        
+        # Label para o campo de ano
+        self.year_label = tk.CTkLabel(self.year_frame, text="Ano:", font=("Arial", 12))
+        self.year_label.pack(side="left", padx=(0, 5), pady=5)
     
         self.directory_button = tk.CTkButton(self, width=150, text="Executar", command= self.rename)
         self.directory_button.pack(padx=12,pady=10)
@@ -70,8 +130,24 @@ class Application(tk.CTkFrame):
         self.space_label = tk.CTkLabel(self, text="", height=1)
         self.space_label.pack()
 
-        image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "logo")
-        self.logo_image = tk.CTkImage(Image.open(os.path.join(image_path, "brc_b3.png")), size=(200, 100))
+        # Configura o caminho das imagens
+        possible_image_paths = [
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "logo"),
+            os.path.join(os.getcwd(), "assets", "logo"),
+            "assets/logo"
+        ]
+        
+        image_path = None
+        for path in possible_image_paths:
+            if os.path.exists(path):
+                image_path = path
+                break
+        
+        if image_path:
+            self.logo_image = tk.CTkImage(Image.open(os.path.join(image_path, "brc_b3.png")), size=(200, 100))
+        else:
+            print("Pasta de imagens não encontrada")
+            self.logo_image = None
         self.logo_label = tk.CTkLabel(self, text=None, image=self.logo_image)
         self.logo_label.pack()
 
@@ -94,7 +170,7 @@ class Application(tk.CTkFrame):
                                 offvalue="Desativado")
         self.switch.pack(padx=10, pady=10)
         
-        self.copyright_label = tk.CTkLabel(self, text="Versão 4.2 - © Brascontrol", font=("Arial", 12))
+        self.copyright_label = tk.CTkLabel(self, text="Versão 4.3 - © Brascontrol", font=("Arial", 12))
         self.copyright_label.pack()
 
     def select_directory(self):
@@ -118,6 +194,27 @@ class Application(tk.CTkFrame):
         if not old_name or not new_name:
             messagebox.showwarning("Aviso", "Selecione um lote e digite o novo nome")
             return
+        
+        # Obtém as configurações de ano
+        add_year = self.add_year_var.get()
+        year = self.year_entry.get().strip() if add_year else None
+        
+        # Valida o ano se estiver habilitado
+        if add_year and year:
+            try:
+                year_int = int(year)
+                if year_int < 2000 or year_int > 2100:
+                    messagebox.showwarning("Aviso", "Ano deve estar entre 2000 e 2100")
+                    return
+            except ValueError:
+                messagebox.showwarning("Aviso", "Ano deve ser um número válido")
+                return
+        
+        # Configura o ano nos editores de texto
+        if self.text_file_editor:
+            self.text_file_editor.set_year_config(add_year, year)
+        if self.file_renamer:
+            self.file_renamer.set_year_config(add_year, year)
             
         if self.file_renamer.rename_directory(old_name, new_name):
             self.file_renamer.rename_files(old_name, new_name)
@@ -133,7 +230,7 @@ class Application(tk.CTkFrame):
 
 
     def show_help_message(self):
-        message = "1 - Selecione o diretorio onde se encontra os Lotes:\n2 - Escolha o lote a ser renomeado poder pasta ou arquivo zip\n3 - digite o novo nome do Lote\n4 - Clique em Executar\n\nNome de lotes aceitos:\nL05282, 0005282, L0230712\nL05282.zip, 000582.zip, L0230712.zip\n\nFuncionalidades de Infrações:\n- Analise automática de códigos de infração\n- Alteração em massa de códigos\n- 5673: Parado sobre faixa de pedestre\n- 6050: Avanço de sinal vermelho\n- 7587: Transitar em faixa exclusiva"                  
+        message = "1 - Selecione o diretorio onde se encontra os Lotes:\n2 - Escolha o lote a ser renomeado poder pasta ou arquivo zip\n3 - digite o novo nome do Lote\n4 - Configure o ano do código de infração:\n   • Marque a opção para adicionar ano\n   • Digite o ano desejado (padrão: 2023)\n   • Desmarque para não adicionar ano\n5 - Clique em Executar\n\nNome de lotes aceitos:\nL05282, 0005282, L0230712\nL05282.zip, 000582.zip, L0230712.zip\n\nFuncionalidades de Infrações:\n- Analise automática de códigos de infração\n- Alteração em massa de códigos\n- 5673: Parado sobre faixa de pedestre\n- 6050: Avanço de sinal vermelho\n- 7587: Transitar em faixa exclusiva\n\nConfiguração de Ano:\n- Com ano: BRI1132/2023\n- Sem ano: BRI1132"                  
         messagebox.showinfo("Ajuda", message)
 
     def auto_analyze_and_suggest_changes(self, lote_name):

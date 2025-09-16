@@ -7,12 +7,8 @@ Ponto de entrada principal da aplicação
 import sys
 import os
 
-# Adiciona o diretório config ao path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'config'))
-
-# Configura o ambiente
-from paths import setup_environment
-setup_environment()
+# Adiciona o diretório src ao path do Python
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 # Importa e executa a aplicação
 from main import main

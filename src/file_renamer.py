@@ -4,36 +4,28 @@ import zipfile
 import rarfile
 import shutil
 import re
+from utils import (
+    LotNumberUtils, 
+    DirectoryUtils, 
+    JpgFilenameProcessor, 
+    FileValidationUtils,
+    LoggingUtils
+)
 
 
 class FileRenamer:
     def __init__(self, directory):
         self.directory = directory
+        self.add_year = True  # Default: adicionar ano
+        self.year = "2023"    # Default: ano 2023
     
     def _extract_numbers_from_name(self, name):
-        """
-        Extrai o número do nome do lote, removendo o prefixo 'L' se existir.
-        
-        Args:
-            name (str): Nome do lote (ex: "L0544" ou "0544")
-            
-        Returns:
-            str: Número do lote sem prefixo (ex: "0544")
-        """
-        return name[1:] if name.startswith('L') else name
+        """Delega para LotNumberUtils."""
+        return LotNumberUtils.extract_numbers_from_name(name)
     
     def _create_padded_number(self, number, padding=7):
-        """
-        Cria um número com padding específico de zeros à esquerda.
-        
-        Args:
-            number (str): Número a ser padronizado
-            padding (int): Quantidade de dígitos desejada (padrão: 7)
-            
-        Returns:
-            str: Número padronizado com zeros à esquerda
-        """
-        return str(number).zfill(padding)
+        """Delega para LotNumberUtils."""
+        return LotNumberUtils.create_padded_number(number, padding)
     
     def _move_directory_content(self, source_path, target_path):
         """
@@ -64,87 +56,12 @@ class FileRenamer:
                 shutil.move(source, target)
     
     def _get_search_directories(self):
-        """
-        Obtém todos os diretórios onde devemos procurar por arquivos.
-        
-        Returns:
-            list: Lista de caminhos de diretórios
-        """
-        search_directories = [self.directory]
-        
-        # Percorre todos os subdiretórios recursivamente
-        for root, dirs, files in os.walk(self.directory):
-            for dir_name in dirs:
-                dir_path = os.path.join(root, dir_name)
-                if dir_path not in search_directories:
-                    search_directories.append(dir_path)
-                    
-        return search_directories
+        """Delega para DirectoryUtils."""
+        return DirectoryUtils.get_search_directories(self.directory)
     
     def _should_rename_file(self, filename, old_name_number):
-        """
-        Verifica se um arquivo deve ser renomeado com base no número antigo.
-        
-        Args:
-            filename (str): Nome do arquivo
-            old_name_number (str): Número antigo do lote
-            
-        Returns:
-            bool: True se o arquivo deve ser renomeado, False caso contrário
-        """
-        base_filename = os.path.basename(filename)
-        file_name_without_ext = os.path.splitext(base_filename)[0]
-        file_ext = os.path.splitext(base_filename)[1]
-        
-        # Verifica se o arquivo contém o número antigo
-        if old_name_number in file_name_without_ext:
-            return True
-            
-        # Verifica padrões numéricos equivalentes
-        old_number_trimmed = old_name_number.lstrip('0')
-        if old_number_trimmed in file_name_without_ext:
-            # Verifica se a sequência encontrada representa o mesmo número
-            found_sequences = re.findall(r'\d+', file_name_without_ext)
-            for seq in found_sequences:
-                seq_trimmed = seq.lstrip('0')
-                # Verifica se o número antigo está no início da sequência encontrada
-                if seq_trimmed.startswith(old_number_trimmed) and len(seq) >= 5:
-                    return True
-        
-        # Verifica padrões como "L00125" quando old_name_number é "0000125"
-        if len(old_name_number) >= 6 and old_name_number.startswith('00'):
-            old_number_trimmed = old_name_number.lstrip('0')
-            if f"L{old_number_trimmed.zfill(5)}" in base_filename or f"L00{old_number_trimmed}" in base_filename:
-                return True
-                
-        # Verifica padrão reverso: se old_name contém "L" e arquivo contém número
-        if old_name_number.startswith('L') and any(part in base_filename for part in [old_name_number, old_name_number.lstrip('0')]):
-            return True
-            
-        # Caso especial: arquivo .txt sem prefixo L quando new_name tem L
-        # (Esta lógica será tratada separadamente na função de renomeação)
-        
-        # Caso especial: arquivo L00125.txt que sempre deve ser renomeado para o lote atual
-        if file_name_without_ext == 'L00125' and file_ext.lower() == '.txt':
-            return True
-            
-        # Caso especial para arquivos JPG - verifica padrões mais complexos
-        if file_ext.lower() == '.jpg':
-            # Procura por sequências numéricas no nome do arquivo
-            digit_sequences = re.findall(r'\d{5,}', file_name_without_ext)
-            old_number_trimmed = old_name_number.lstrip('0')
-            
-            # Verifica se alguma sequência começa com o número antigo
-            for seq in digit_sequences:
-                seq_trimmed = seq.lstrip('0')
-                if seq_trimmed.startswith(old_number_trimmed):
-                    return True
-                    
-                # Verifica se o número antigo está contido na sequência
-                if old_number_trimmed in seq_trimmed:
-                    return True
-        
-        return False
+        """Delega para FileValidationUtils."""
+        return FileValidationUtils.should_rename_file(filename, old_name_number)
     
     def _rename_jpg_file(self, filename, old_name_number, new_name_number):
         """
@@ -160,48 +77,19 @@ class FileRenamer:
         """
         try:
             base_filename = os.path.basename(filename)
-            file_name_without_ext = os.path.splitext(base_filename)[0]
             file_ext = os.path.splitext(base_filename)[1]
             
             if file_ext.lower() != '.jpg':
                 return False
             
-            # Para arquivos JPG, garante que o novo número tenha exatamente 7 dígitos
-            new_number_padded = self._create_padded_number(new_name_number)
-            old_number_padded = self._create_padded_number(old_name_number)
+            # Usa o processador de JPG para obter o novo nome
+            new_filename = JpgFilenameProcessor.update_jpg_filename(
+                base_filename, old_name_number, new_name_number
+            )
             
-            # Verifica se o arquivo começa com o número do lote
-            if file_name_without_ext.startswith(old_number_padded):
-                rest_part = file_name_without_ext[len(old_number_padded):]
-                old_number_trimmed = old_name_number.lstrip('0')
-                
-                # Verifica se há duplicação no rest_part
-                # Padrão: 000017070000060a -> 0000170 + 70 + 000060a
-                # Onde 70 são os últimos 2 dígitos do lote (170 -> 70)
-                if len(rest_part) >= 2 and len(old_number_trimmed) >= 2:
-                    last_two_digits = old_number_trimmed[-2:]
-                    first_two_rest = rest_part[:2]
-                    
-                    if first_two_rest == last_two_digits:
-                        # Remove a duplicação (primeiros 2 dígitos do rest_part)
-                        corrected_rest = rest_part[2:]
-                        new_file_name_without_ext = new_number_padded + corrected_rest
-                        return self._perform_file_rename(filename, new_file_name_without_ext + file_ext)
-                    else:
-                        # Sem duplicação, mantém o rest_part como está
-                        new_file_name_without_ext = new_number_padded + rest_part
-                        return self._perform_file_rename(filename, new_file_name_without_ext + file_ext)
-                else:
-                    # Rest_part muito curto ou old_number muito curto
-                    new_file_name_without_ext = new_number_padded + rest_part
-                    return self._perform_file_rename(filename, new_file_name_without_ext + file_ext)
+            # Realiza a renomeação
+            return self._perform_file_rename(filename, new_filename)
             
-            # Fallback: substituição direta se o número antigo estiver em qualquer lugar
-            if old_number_padded in file_name_without_ext:
-                new_file_name_without_ext = file_name_without_ext.replace(old_number_padded, new_number_padded, 1)
-                return self._perform_file_rename(filename, new_file_name_without_ext + file_ext)
-            
-            return False
         except Exception as e:
             print(f"Erro ao renomear arquivo JPG {filename}: {e}")
             return False
@@ -234,7 +122,7 @@ class FileRenamer:
             
             try:
                 os.rename(old_filename, full_new_filename)
-                print(f"    ✅ Arquivo renomeado com sucesso: {old_filename} -> {full_new_filename}")
+                LoggingUtils.log_file_rename(old_filename, full_new_filename, True)
                 return True
             except Exception as e:
                 print(f"    ❌ Erro ao renomear {old_filename}: {e}")
@@ -799,9 +687,11 @@ class FileRenamer:
                         # Atualiza o primeiro campo (número do lote)
                         line_split[0] = self._create_padded_number(new_name_number)
                         
-                        # Verifica se já não tem '/2023' antes de adicionar
-                        if len(line_split) > 1 and not line_split[1].endswith('/2023'):
-                            line_split[1] = line_split[1] + '/2023'
+                        # Verifica se deve adicionar ano e se já não tem ano
+                        if (self.add_year and self.year and 
+                            len(line_split) > 1 and 
+                            not line_split[1].endswith(f'/{self.year}')):
+                            line_split[1] = line_split[1] + f'/{self.year}'
                         
                         # Processa todos os campos da linha para atualizar nomes de arquivos
                         for i in range(1, len(line_split)):
@@ -832,99 +722,20 @@ class FileRenamer:
                 print(f"Arquivo de texto atualizado: {filename}")
     
     def _update_jpg_filename_in_text(self, filename, old_name_number, new_name_number):
-        """
-        Atualiza nomes de arquivos JPG em uma linha de texto.
-        Esta função unifica a lógica de processamento de nomes JPG entre FileRenamer e TextFileEditor.
-        
-        Args:
-            filename (str): Nome do arquivo JPG a ser atualizado
-            old_name_number (str): Número antigo do lote
-            new_name_number (str): Número novo do lote
-            
-        Returns:
-            str: Nome do arquivo atualizado
-        """
-        # Remove prefixo '00' se existir
-        if filename.startswith('00'):
-            filename = filename[2:]
-        
-        # Aplica a lógica de substituição para nomes de arquivos JPG
-        # Procura por sequências numéricas no nome do arquivo
-        digit_sequences = re.findall(r'\d{5,}', filename)
-        
-        # Para cada sequência encontrada, verifica se corresponde ao padrão antigo
-        for seq in sorted(digit_sequences, key=len, reverse=True):
-            # Verifica se a sequência contém o número antigo
-            old_number_trimmed = old_name_number.lstrip('0')
-            seq_trimmed = seq.lstrip('0')
-            
-            if seq_trimmed.startswith(old_number_trimmed):
-                # Substitui apenas a parte que corresponde ao número do lote
-                # Garantindo que o novo número tenha exatamente 7 dígitos
-                correct_new_number = self._create_padded_number(new_name_number)
-                # Calcula a parte restante após o número do lote
-                # A parte restante é o que vem depois do número do lote na sequência
-                rest_part = seq[len(old_number_trimmed):]
-                # Cria o novo padrão: novo número com 7 dígitos + parte restante
-                new_seq = correct_new_number + rest_part
-                filename = filename.replace(seq, new_seq)
-                break  # Processa apenas a primeira sequência encontrada
-            # Verifica também se a sequência inteira corresponde ao número do lote
-            elif seq == old_name_number or seq_trimmed == old_number_trimmed:
-                # Substitui a sequência inteira pelo novo número padronizado
-                correct_new_number = self._create_padded_number(new_name_number)
-                filename = filename.replace(seq, correct_new_number)
-                break  # Processa apenas a primeira sequência encontrada
-        
-        return filename
+        """Delega para JpgFilenameProcessor."""
+        return JpgFilenameProcessor.update_jpg_filename(filename, old_name_number, new_name_number)
     
     def _fix_jpg_filename_pattern(self, filename_part, lot_number):
+        """Delega para JpgFilenameProcessor."""
+        return JpgFilenameProcessor.update_jpg_filename(filename_part, lot_number, lot_number)
+    
+    def set_year_config(self, add_year, year):
         """
-        Corrige padrões incorretos em nomes de arquivos JPG.
-        
-        Exemplo: '000017070000060a.jpg' -> '00001700000060a.jpg'
-                 '0000170' + '70000060a.jpg' -> '0000170' + '0000060a.jpg'
+        Configura se deve adicionar ano e qual ano usar.
         
         Args:
-            filename_part (str): Parte do nome do arquivo JPG
-            lot_number (str): Número do lote atual
-            
-        Returns:
-            str: Nome do arquivo corrigido
+            add_year (bool): Se deve adicionar ano ao código de infração
+            year (str): Ano a ser adicionado (ex: "2023")
         """
-        try:
-            # Verifica se é um arquivo JPG
-            if not filename_part.lower().endswith('.jpg'):
-                return filename_part
-                
-            # Extrai o nome do arquivo sem extensão
-            file_name_without_ext = os.path.splitext(filename_part)[0]
-            file_ext = os.path.splitext(filename_part)[1]
-            
-            # Número do lote com padding
-            lot_number_padded = self._create_padded_number(lot_number)
-            lot_number_trimmed = lot_number.lstrip('0')
-            
-            # Verifica se o número do lote está no nome do arquivo
-            if lot_number_padded in file_name_without_ext:
-                # Encontra a posição do número do lote
-                lot_pos = file_name_without_ext.find(lot_number_padded)
-                if lot_pos != -1:
-                    # Pega o restante do nome após o número do lote
-                    rest_part = file_name_without_ext[lot_pos + len(lot_number_padded):]
-                    
-                    # Verifica se o restante começa com o último dígito do número do lote completo
-                    # Isso indica que houve uma duplicação do último dígito
-                    if (len(rest_part) > 0 and len(lot_number_padded) > 0 and 
-                        rest_part[0] == lot_number_padded[-1]):
-                        # Remove o primeiro caractere do restante (que é duplicado)
-                        corrected_rest = rest_part[1:] if len(rest_part) > 1 else ""
-                        # Reconstrói o nome do arquivo
-                        corrected_name = lot_number_padded + corrected_rest
-                        return corrected_name + file_ext
-            
-            # Retorna o nome original se não encontrou padrões incorretos
-            return filename_part
-        except Exception as e:
-            print(f"Erro ao corrigir padrão de nome de arquivo JPG: {e}")
-            return filename_part
+        self.add_year = add_year
+        self.year = year if add_year else None
