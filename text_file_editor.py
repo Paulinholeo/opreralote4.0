@@ -66,42 +66,38 @@ class TextFileEditor:
         Returns:
             str: Nome do arquivo atualizado
         """
-        # Guarda o conteúdo original
-        original_content = filename
-        
-        # Remove prefixo '00' se existir
-        if filename.startswith('00'):
-            filename = filename[2:]
-        
-        # Padroniza os números para comparação
+        # Padroniza os números
         old_number_trimmed = old_name_number.lstrip('0')
         new_number_padded = self._create_padded_number(new_name_number)
         
-        # Procura por sequências de 5 ou mais dígitos
-        digit_sequences = re.findall(r'\d{5,}', filename)
+        # Procura pelo padrão específico: 00 + número_do_lote
+        pattern = r'00' + re.escape(old_number_trimmed)
+        match = re.search(pattern, filename)
         
-        # Para cada sequência encontrada, verifica se corresponde ao padrão antigo
-        for seq in sorted(digit_sequences, key=len, reverse=True):
-            seq_trimmed = seq.lstrip('0')
+        if match:
+            # Substitui o padrão encontrado pelo novo número
+            # Mas também remove o número sequencial que vem depois
+            start_pos = match.end()
+            remaining = filename[start_pos:]
             
-            # Verifica se a sequência inteira corresponde ao número do lote
-            if seq == old_name_number or seq_trimmed == old_number_trimmed:
-                # Substitui a sequência inteira pelo novo número padronizado
-                filename = filename.replace(seq, new_number_padded)
-                break  # Processa apenas a primeira sequência encontrada
-            
-            # Verifica se a sequência contém o número antigo seguido imediatamente por zeros
-            # (padrão: número do lote + zeros + resto)
-            elif seq_trimmed.startswith(old_number_trimmed + '0'):
-                # Encontra a posição do número antigo na sequência original
-                zeros_removed = len(seq) - len(seq_trimmed)
-                pos_in_original = zeros_removed + len(old_number_trimmed)
-                # Calcula a parte restante após o número do lote
-                rest_part = seq[pos_in_original:]
-                # Cria o novo padrão: novo número com 7 dígitos + parte restante
-                new_seq = new_number_padded + rest_part
-                filename = filename.replace(seq, new_seq)
-                break  # Processa apenas a primeira sequência encontrada
+        # Procura por um número sequencial (2 dígitos, não 00) seguido de zeros
+        seq_match = re.match(r'([1-9]\d)0+', remaining)
+        if seq_match:
+            # Remove o número sequencial e mantém apenas os zeros
+            seq_number = seq_match.group(1)
+            zeros_part = remaining[len(seq_number):]
+            new_remaining = zeros_part
+        else:
+            # Se não há número sequencial, mantém o resto como está
+            new_remaining = remaining
+        
+        filename = new_number_padded + new_remaining
+    else:
+        # Fallback: procura por qualquer ocorrência do número antigo
+        if old_name_number in filename:
+            filename = filename.replace(old_name_number, new_number_padded)
+        elif old_number_trimmed in filename:
+            filename = filename.replace(old_number_trimmed, new_number_padded)
         
         return filename
 
