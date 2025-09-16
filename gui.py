@@ -94,7 +94,7 @@ class Application(tk.CTkFrame):
                                 offvalue="Desativado")
         self.switch.pack(padx=10, pady=10)
         
-        self.copyright_label = tk.CTkLabel(self, text="Versão 4.0 - © Brascontrol", font=("Arial", 12))
+        self.copyright_label = tk.CTkLabel(self, text="Versão 4.2 - © Brascontrol", font=("Arial", 12))
         self.copyright_label.pack()
 
     def select_directory(self):
