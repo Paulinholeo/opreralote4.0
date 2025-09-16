@@ -7,12 +7,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('logo/brc_b3.png', 'logo'),
-        ('logo/chat_dark.png', 'logo'),
-        ('logo/chat_light.png', 'logo'),
-        ('logo/get_help_small.png', 'logo'),
-        ('logo/b.ico', 'logo'),
-        ('logo/b2.ico', 'logo')
+        ('logo', 'logo')
     ],
     hiddenimports=['rarfile', 'text_file_editor', 'file_renamer', 'infraction_analyzer'],
     hookspath=[],
