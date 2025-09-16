@@ -73,33 +73,43 @@ class TextFileEditor:
         if filename.startswith('00'):
             filename = filename[2:]
         
-        # Aplica a lógica de substituição para nomes de arquivos JPG
+        # Padroniza os números para comparação
+        old_number_trimmed = old_name_number.lstrip('0')
+        new_number_padded = self._create_padded_number(new_name_number)
+        
         # Procura por sequências de 5 ou mais dígitos
         digit_sequences = re.findall(r'\d{5,}', filename)
         
         # Para cada sequência encontrada, verifica se corresponde ao padrão antigo
         for seq in sorted(digit_sequences, key=len, reverse=True):
-            # Verifica se a sequência contém o número antigo
-            old_number_trimmed = old_name_number.lstrip('0')
             seq_trimmed = seq.lstrip('0')
             
+            # Verifica se a sequência contém o número antigo
             if seq_trimmed.startswith(old_number_trimmed):
-                # Substitui apenas a parte que corresponde ao número do lote
-                # Garantindo que o novo número tenha exatamente 7 dígitos
-                correct_new_number = self._create_padded_number(new_name_number)
                 # Calcula a parte restante após o número do lote
                 # A parte restante é o que vem depois do número do lote na sequência
                 rest_part = seq[len(old_number_trimmed):]
                 # Cria o novo padrão: novo número com 7 dígitos + parte restante
-                new_seq = correct_new_number + rest_part
+                new_seq = new_number_padded + rest_part
                 filename = filename.replace(seq, new_seq)
                 break  # Processa apenas a primeira sequência encontrada
             # Verifica também se a sequência inteira corresponde ao número do lote
             elif seq == old_name_number or seq_trimmed == old_number_trimmed:
                 # Substitui a sequência inteira pelo novo número padronizado
-                correct_new_number = self._create_padded_number(new_name_number)
-                filename = filename.replace(seq, correct_new_number)
+                filename = filename.replace(seq, new_number_padded)
                 break  # Processa apenas a primeira sequência encontrada
+            # Verifica se a sequência contém o número antigo em qualquer posição
+            elif old_number_trimmed in seq_trimmed:
+                # Encontra a posição do número antigo na sequência
+                pos = seq_trimmed.find(old_number_trimmed)
+                if pos >= 0:
+                    # Calcula a parte antes e depois do número antigo
+                    before_part = seq[:pos + (len(seq) - len(seq_trimmed))]
+                    after_part = seq[pos + len(old_number_trimmed) + (len(seq) - len(seq_trimmed)):]
+                    # Cria o novo padrão: parte antes + novo número + parte depois
+                    new_seq = before_part + new_number_padded + after_part
+                    filename = filename.replace(seq, new_seq)
+                    break  # Processa apenas a primeira sequência encontrada
         
         return filename
 
@@ -111,6 +121,7 @@ class TextFileEditor:
         new_name_number = self._create_padded_number(new_name_number)
         print(f'Text Content: {new_name_number} ')
         print(f'Text Old Number: {old_name_number}')
+        print(f'Processando arquivos de texto para renomeação de {old_name} para {new_name}')
 
         # Define os diretórios onde procurar arquivos de texto
         search_directories = self._get_search_directories()
@@ -150,8 +161,11 @@ class TextFileEditor:
                                 if line_split[i]:
                                     # Verifica se o campo contém um nome de arquivo JPG
                                     if line_split[i].endswith('.jpg'):
+                                        original_jpg = line_split[i]
                                         line_split[i] = self._update_jpg_filename(
                                             line_split[i], old_name_number, new_name_number)
+                                        if original_jpg != line_split[i]:
+                                            print(f"  JPG atualizado: {original_jpg} -> {line_split[i]}")
                                     else:
                                         # Para outros campos, aplica a substituição simples
                                         # mas apenas se o campo contém o número antigo
@@ -159,9 +173,21 @@ class TextFileEditor:
                                             line_split[i] = line_split[i].replace(
                                                 old_name_number, self._create_padded_number(new_name_number))
                         else:
-                            # Para linhas que não contém o número antigo, apenas atualiza o primeiro campo
+                            # Para linhas que não contém o número antigo, atualiza o primeiro campo
+                            # e verifica se há arquivos JPG que precisam ser atualizados
                             if len(line_split) > 0:
                                 line_split[0] = self._create_padded_number(new_name_number)
+                                
+                                # Verifica se há arquivos JPG nos outros campos que precisam ser atualizados
+                                for i in range(1, len(line_split)):
+                                    if line_split[i] and line_split[i].endswith('.jpg'):
+                                        # Verifica se o arquivo JPG contém o número antigo
+                                        if old_name_number in line_split[i]:
+                                            original_jpg = line_split[i]
+                                            line_split[i] = self._update_jpg_filename(
+                                                line_split[i], old_name_number, new_name_number)
+                                            if original_jpg != line_split[i]:
+                                                print(f"  JPG atualizado (linha sem número antigo): {original_jpg} -> {line_split[i]}")
 
                         new_line = ';'.join(line_split) + '\n'
                         print(f"Linha processada: {new_line.strip()}")
